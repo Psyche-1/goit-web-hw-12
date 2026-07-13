@@ -1,27 +1,36 @@
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+import jwt
+from jwt import InvalidTokenError
 from sqlalchemy.orm import Session
 
 from src.database.db import get_db
 from src.database.models import User
 # Імпортуємо налаштування з нового конфігу
 from src.conf.config import settings
-import bcrypt
 
 # Використовуємо змінні з .env файлу
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+
 
 class HashService:
     @staticmethod
+    def is_password_length_valid(password: str) -> bool:
+        return len(password.encode("utf-8")) <= 72
+
+    @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
+        if not HashService.is_password_length_valid(plain_password):
+            return False
+
         # Перетворюємо рядки в байти, оскільки bcrypt працює з байтами
         password_bytes = plain_password.encode('utf-8')
         hashed_bytes = hashed_password.encode('utf-8')
@@ -29,6 +38,9 @@ class HashService:
 
     @staticmethod
     def get_password_hash(password: str) -> str:
+        if not HashService.is_password_length_valid(password):
+            raise ValueError("Password exceeds bcrypt's 72-byte limit")
+
         # Хешуємо пароль за допомогою чистого bcrypt
         password_bytes = password.encode('utf-8')
         salt = bcrypt.gensalt()
@@ -47,6 +59,11 @@ class TokenService:
         to_encode.update({"exp": expire, "scope": "refresh_token" if is_refresh else "access_token"})
         return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+    @staticmethod
+    def hash_token(token: str) -> str:
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -59,7 +76,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         scope: str = payload.get("scope")
         if email is None or scope != "access_token":
             raise credentials_exception
-    except JWTError:
+    except InvalidTokenError:
         raise credentials_exception
         
     user = db.query(User).filter(User.email == email).first()

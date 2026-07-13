@@ -27,6 +27,9 @@ def signup(body: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(body: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    if len(body.username) > 254 or not HashService.is_password_length_valid(body.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Невірна пошта або пароль")
+
     user = db.query(User).filter(User.email == body.username).first()
     if user is None or not HashService.verify_password(body.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Невірна пошта або пароль")
@@ -35,8 +38,7 @@ def login(body: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     access_token = TokenService.create_token(data={"sub": user.email}, expires_delta=timedelta(minutes=30))
     refresh_token = TokenService.create_token(data={"sub": user.email}, expires_delta=timedelta(days=7), is_refresh=True)
     
-    # Записуємо refresh_token користувачу в базу
-    user.refresh_token = refresh_token
+    user.refresh_token = TokenService.hash_token(refresh_token)
     db.commit()
     
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}

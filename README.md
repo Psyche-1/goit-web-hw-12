@@ -35,12 +35,13 @@ pip install -r requirements.txt
 ```
 
 ### Крок 3: Налаштування файлу конфігурації `.env`
-Створіть файл `.env` у корені проєкту (поруч із `main.py`) та додайте туди наступні рядки:
-```env
-DATABASE_URL=sqlite:///./contacts.db
-SECRET_KEY=9a7bcf1489e2c632a514d8962c418f7731a5bcde2193bfa097aefd28c8d356ab
-ALGORITHM=HS256
+Створіть файл `.env` у корені проєкту (поруч із `main.py`) та згенеруйте унікальний ключ підпису:
+```bash
+printf "DATABASE_URL=sqlite:///./contacts.db\nALGORITHM=HS256\n" > .env
+python -c 'import secrets; print(f"SECRET_KEY={secrets.token_hex(32)}")' >> .env
 ```
+
+Не використовуйте приклад або спільний ключ у різних середовищах і не додавайте `.env` чи локальну базу даних до Git.
 
 ### Крок 4: Запуск FastAPI застосунку
 Запустіть сервер розробки за допомогою Uvicorn:

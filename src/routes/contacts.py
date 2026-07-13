@@ -23,7 +23,12 @@ def create_contact(body: ContactCreate, db: Session = Depends(get_db), current_u
 # 2. Отримати список контактів (з інтегрованим пошуком Query з ДЗ 11)
 @router.get("/", response_model=List[ContactResponse])
 def read_contacts(
-    search: Optional[str] = Query(None, description="Пошук за іменем, прізвищем чи email"),
+    search: Optional[str] = Query(
+        None,
+        min_length=1,
+        max_length=100,
+        description="Пошук за іменем, прізвищем чи email",
+    ),
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
