@@ -18,5 +18,9 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        # Відкочуємо незавершену транзакцію, щоб помилка не «зависала» в сесії
+        db.rollback()
+        raise
     finally:
         db.close()

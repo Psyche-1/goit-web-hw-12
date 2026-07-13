@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from datetime import timedelta
 
 from src.database.db import get_db
@@ -21,7 +22,12 @@ def signup(body: UserCreate, db: Session = Depends(get_db)):
     hashed_password = HashService.get_password_hash(body.password)
     new_user = User(email=body.email, password=hashed_password)
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Захист від гонки: пошту могли зайняти між перевіркою та commit
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Користувач з таким Email вже існує")
     db.refresh(new_user)
     return new_user
 

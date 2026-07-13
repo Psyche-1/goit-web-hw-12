@@ -25,7 +25,12 @@ class HashService:
         # Перетворюємо рядки в байти, оскільки bcrypt працює з байтами
         password_bytes = plain_password.encode('utf-8')
         hashed_bytes = hashed_password.encode('utf-8')
-        return bcrypt.checkpw(password_bytes, hashed_bytes)
+        try:
+            return bcrypt.checkpw(password_bytes, hashed_bytes)
+        except ValueError:
+            # Некоректний/пошкоджений хеш у БД — вважаємо пароль невірним,
+            # а не піднімаємо 500 через внутрішню помилку bcrypt
+            return False
 
     @staticmethod
     def get_password_hash(password: str) -> str:
